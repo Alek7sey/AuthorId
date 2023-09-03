@@ -7,7 +7,6 @@ import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
 import ru.netology.coroutines.dto.*
 import java.io.IOException
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.resume
@@ -30,9 +29,17 @@ fun main() {
                 val posts = getPosts(client)
                     .map { post ->
                         async {
-                            PostWithComments(post, getComments(client, post.id))
+                            PostWithComments(
+                                post,
+                                getComments(client, post.id).map { comment ->
+                                    CommentWithAuthor(
+                                        getAuthor(client, comment.authorId),
+                                        comment
+                                    )
+                                })
                         }
-                    }.awaitAll().map { posts ->
+                    }.awaitAll()
+                    .map { posts ->
                         async { PostWithAuthorAndComments(getAuthor(client, posts.post.authorId), posts) }
                     }.awaitAll()
                 println(posts)
