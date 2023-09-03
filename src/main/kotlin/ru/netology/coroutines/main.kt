@@ -7,6 +7,7 @@ import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
 import ru.netology.coroutines.dto.*
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.resume
@@ -23,26 +24,29 @@ private val client = OkHttpClient.Builder()
     .build()
 
 fun main() {
+    val start = Instant.now().toEpochMilli()
     with(CoroutineScope(EmptyCoroutineContext)) {
         launch {
             try {
                 val posts = getPosts(client)
                     .map { post ->
                         async {
-                            PostWithComments(
+                            PostWithAuthorAndComments(
+                                getAuthor(client, post.authorId),
                                 post,
                                 getComments(client, post.id).map { comment ->
-                                    CommentWithAuthor(
-                                        getAuthor(client, comment.authorId),
-                                        comment
-                                    )
-                                })
+                                    async {
+                                        CommentWithAuthor(
+                                            getAuthor(client, comment.authorId),
+                                            comment
+                                        )
+                                    }
+                                }.awaitAll()
+                            )
                         }
                     }.awaitAll()
-                    .map { posts ->
-                        async { PostWithAuthorAndComments(getAuthor(client, posts.post.authorId), posts) }
-                    }.awaitAll()
                 println(posts)
+                println(Instant.now().toEpochMilli() - start)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
